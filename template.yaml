@@ -1,0 +1,152 @@
+AWSTemplateFormatVersion: "2010-09-09"
+Transform: AWS::Serverless-2016-10-31
+Description: Web socket service
+
+Globals:
+  Function:
+    Environment:
+      Variables:
+        AWS_REGION_OP: !Ref "AWS::Region"
+    Runtime: nodejs24.x
+    EphemeralStorage:
+      Size: 1024
+    CodeUri: .
+    Timeout: 30
+
+Resources:
+  ConnectionTable:
+    Type: AWS::Serverless::SimpleTable
+    Properties:
+      TableName: WS-Connections-SKR
+      PrimaryKey:
+        Name: connectionId
+        Type: String
+
+  GroupTable:
+    Type: AWS::DynamoDB::Table
+    Properties:
+      TableName: WS-groups-SKR
+      KeySchema:
+        - AttributeName: groupId
+          KeyType: HASH
+        - AttributeName: connectionId
+          KeyType: RANGE
+
+  ConnectLambdaHandler:
+    Type: AWS::Serverless::Function
+    Properties:
+      FunctionName: ConnectHandler-WS-SKR
+      Handler: connectHandler.handler
+      Policies:
+        - CloudWatchPutMetricPolicy: {}
+        - DynamoDBWritePolicy:
+            TableName: !Ref ConnectionTable
+        - DynamoDBWritePolicy:
+            TableName: !Ref GroupTable
+      Environment:
+        Variables:
+          CONNECTION_TABLE_NAME: !Ref ConnectionTable
+          GROUP_TABLE_NAME: !Ref GroupTable
+    Metadata:
+      BuildMethod: esbuild
+      BuildProperties:
+        Minify: false
+        Sourcemap: true
+        EntryPoints:
+          - src/functions/connectHandler.ts
+        External:
+          - "@aws-sdk/client-dynamodb"
+          - "aws-lambda"
+
+  DisconnectLambdaHandler:
+    Type: AWS::Serverless::Function
+    Properties:
+      FunctionName: DisconnectHandler-WS-SKR
+      Handler: disconnectHandler.handler
+      Policies:
+        - CloudWatchPutMetricPolicy: {}
+        - DynamoDBCrudPolicy:
+            TableName: !Ref ConnectionTable
+        - DynamoDBCrudPolicy:
+            TableName: !Ref GroupTable
+      Environment:
+        Variables:
+          CONNECTION_TABLE_NAME: !Ref ConnectionTable
+          GROUP_TABLE_NAME: !Ref GroupTable
+    Metadata:
+      BuildMethod: esbuild
+      BuildProperties:
+        Minify: false
+        Sourcemap: true
+        EntryPoints:
+          - src/functions/disconnectHandler.ts
+        External:
+          - "@aws-sdk/client-dynamodb"
+          - "aws-lambda"
+
+  SendMessageLambdaHandler:
+    Type: AWS::Serverless::Function
+    Properties:
+      FunctionName: SendmessageHandler-WS-SKR
+      Handler: sendMessage.handler
+      Policies:
+        - CloudWatchPutMetricPolicy: {}
+        - DynamoDBReadPolicy:
+            TableName: !Ref ConnectionTable
+        - DynamoDBReadPolicy:
+            TableName: !Ref GroupTable
+        - Statement:
+            Effect: Allow
+            Action: execute-api:ManageConnections
+            Resource: arn:aws:execute-api:*:*:*/*/*/@connections/*
+      Environment:
+        Variables:
+          CONNECTION_TABLE_NAME: !Ref ConnectionTable
+          GROUP_TABLE_NAME: !Ref GroupTable
+    Metadata:
+      BuildMethod: esbuild
+      BuildProperties:
+        Minify: false
+        Sourcemap: true
+        EntryPoints:
+          - src/functions/sendMessage.ts
+        External:
+          - "@aws-sdk/client-dynamodb"
+          - "aws-lambda"
+          - "@aws-sdk/client-apigatewaymanagementapi"
+
+  DefaultLambdaHandler:
+    Type: AWS::Serverless::Function
+    Properties:
+      FunctionName: DefaultHandler-WS-SKR
+      Handler: defaultHandler.handler
+      Policies:
+        - CloudWatchPutMetricPolicy: {}
+        - Statement:
+            Effect: Allow
+            Action: execute-api:ManageConnections
+            Resource: arn:aws:execute-api:*:*:*/*/*/@connections/*
+    Metadata:
+      BuildMethod: esbuild
+      BuildProperties:
+        Minify: false
+        Sourcemap: true
+        EntryPoints:
+          - src/functions/defaultHandler.ts
+        External:
+          - "@aws-sdk/client-dynamodb"
+          - "aws-lambda"
+          - "@aws-sdk/client-apigatewaymanagementapi"
+
+  WebsocketApi:
+    Type: AWS::ApiGatewayV2::Api
+    Properties:
+      Name: Websocket-Api-SKR
+      ProtocolType: WEBSOCKET
+      RouteSelectionExpression: "$request.body.action"
+
+  ConnectRoute:
+    Type: AWS::ApiGatewayV2::Route
+    Properties:
+      RouteKey: 
+      ApiId: 
