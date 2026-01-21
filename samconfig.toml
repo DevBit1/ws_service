@@ -1,0 +1,13 @@
+version = 0.1
+
+[dev.deploy.parameters]
+stack_name = "WS-Service-SKR"
+resolve_s3 = true
+s3_prefix = "WS-Service-SKR"
+region = "ap-south-1"
+confirm_changeset = true
+capabilities = "CAPABILITY_IAM"
+image_repositories = []
+
+[dev.global.parameters]
+region = "ap-south-1"

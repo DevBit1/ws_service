@@ -20,12 +20,9 @@ export const handler = async (event: APIGatewayEvent) => {
 
     await postMessage(apiClient, connectionId, JSON.stringify(info));
 
-    return new ResponseObj(200, {});
+    return new ResponseObj(200);
   } catch (err) {
     console.log(err);
-    return new ResponseObj(500, {
-      message:
-        err instanceof Error ? err.message : "Error when sending message",
-    });
+    return new ResponseObj(500);
   }
 };

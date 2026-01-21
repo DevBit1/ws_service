@@ -26,6 +26,7 @@ export const postMessage = async (
     );
   } catch (error) {
     console.error(`Error while sending message to - ${connectionId}`);
+    throw error
   }
 };
 
@@ -41,5 +42,6 @@ export const getConnectionInfo = async (
     );
   } catch (error) {
     console.error(`Error while sending message to - ${connectionId}`);
+    throw error
   }
 };

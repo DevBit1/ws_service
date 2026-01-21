@@ -4,7 +4,10 @@
   "description": "",
   "main": "index.js",
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "test": "jest --coverage",
+    "sam:build": "sam build --config-env dev --config-file samconfig.toml",
+    "sam:deploy": "sam deploy --config-env dev --config-file samconfig.toml",
+    "sam:sync": "sam sync --config-env dev --config-file samconfig.toml"
   },
   "keywords": [],
   "author": "",
@@ -13,11 +16,15 @@
   "dependencies": {
     "@aws-sdk/client-apigatewaymanagementapi": "^3.972.0",
     "@aws-sdk/client-dynamodb": "^3.972.0",
-    "@aws-sdk/lib-dynamodb": "^3.972.0"
+    "@aws-sdk/lib-dynamodb": "^3.972.0",
+    "esbuild": "^0.27.2"
   },
   "devDependencies": {
+    "@jest/globals": "^30.2.0",
     "@types/aws-lambda": "^8.10.160",
+    "@types/jest": "^30.0.0",
     "@types/node": "^25.0.9",
+    "aws-sdk-client-mock": "^4.1.0",
     "jest": "^30.2.0",
     "ts-jest": "^29.4.6",
     "ts-node": "^10.9.2"

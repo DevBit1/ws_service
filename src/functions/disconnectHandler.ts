@@ -10,9 +10,7 @@ export const handler = async function (event: APIGatewayEvent) {
     const routeKey = event?.requestContext?.routeKey || "";
 
     if (!routeKey) {
-      return new ResponseObj(400, {
-        message: "Invalid route",
-      });
+      return new ResponseObj(400);
     }
 
     let command;
@@ -32,9 +30,7 @@ export const handler = async function (event: APIGatewayEvent) {
         const payload = JSON.parse(event?.body || "{}");
 
         if (!payload?.groupId) {
-          return new ResponseObj(400, {
-            message: "Group Id is required to join a group",
-          });
+          return new ResponseObj(400);
         }
 
         command = new DeleteCommand({
@@ -48,16 +44,13 @@ export const handler = async function (event: APIGatewayEvent) {
         break;
       }
       default:
-        return new ResponseObj(400, {
-          message: "Invalid route",
-        });
+        return new ResponseObj(400);
     }
 
     await docClient.send(command);
+    return new ResponseObj(200);
   } catch (err) {
     console.log(err);
-    return new ResponseObj(500, {
-      message: err instanceof Error ? err.message : "Error when disconnecting",
-    });
+    return new ResponseObj(500);
   }
 };

@@ -26,14 +26,21 @@ Resources:
     Type: AWS::DynamoDB::Table
     Properties:
       TableName: WS-groups-SKR
+      AttributeDefinitions:
+        - AttributeName: groupId
+          AttributeType: S
+        - AttributeName: connectionId
+          AttributeType: S
       KeySchema:
         - AttributeName: groupId
           KeyType: HASH
         - AttributeName: connectionId
           KeyType: RANGE
+      BillingMode: PAY_PER_REQUEST
 
   ConnectLambdaHandler:
     Type: AWS::Serverless::Function
+    DependsOn: ConnectLambdaHandlerLogGroup
     Properties:
       FunctionName: ConnectHandler-WS-SKR
       Handler: connectHandler.handler
@@ -58,8 +65,17 @@ Resources:
           - "@aws-sdk/client-dynamodb"
           - "aws-lambda"
 
+  ConnectLambdaHandlerLogGroup:
+    Type: AWS::Logs::LogGroup
+    Properties:
+      LogGroupName: /aws/lambda/ConnectHandler-WS-SKR
+      RetentionInDays: 7
+    DeletionPolicy: Delete
+    UpdateReplacePolicy: Delete
+
   DisconnectLambdaHandler:
     Type: AWS::Serverless::Function
+    DependsOn: DisconnectLambdaHandlerLogGroup
     Properties:
       FunctionName: DisconnectHandler-WS-SKR
       Handler: disconnectHandler.handler
@@ -84,8 +100,17 @@ Resources:
           - "@aws-sdk/client-dynamodb"
           - "aws-lambda"
 
+  DisconnectLambdaHandlerLogGroup:
+    Type: AWS::Logs::LogGroup
+    Properties:
+      LogGroupName: /aws/lambda/DisconnectHandler-WS-SKR
+      RetentionInDays: 7
+    DeletionPolicy: Delete
+    UpdateReplacePolicy: Delete
+
   SendMessageLambdaHandler:
     Type: AWS::Serverless::Function
+    DependsOn: SendMessageLambdaHandlerLogGroup
     Properties:
       FunctionName: SendmessageHandler-WS-SKR
       Handler: sendMessage.handler
@@ -96,9 +121,11 @@ Resources:
         - DynamoDBReadPolicy:
             TableName: !Ref GroupTable
         - Statement:
-            Effect: Allow
-            Action: execute-api:ManageConnections
-            Resource: arn:aws:execute-api:*:*:*/*/*/@connections/*
+            - Effect: Allow
+              Action:
+                - "execute-api:ManageConnections"
+              Resource:
+                - !Sub "arn:aws:execute-api:${AWS::Region}:${AWS::AccountId}:${WebsocketApi}/*"
       Environment:
         Variables:
           CONNECTION_TABLE_NAME: !Ref ConnectionTable
@@ -115,17 +142,28 @@ Resources:
           - "aws-lambda"
           - "@aws-sdk/client-apigatewaymanagementapi"
 
+  SendMessageLambdaHandlerLogGroup:
+    Type: AWS::Logs::LogGroup
+    Properties:
+      LogGroupName: /aws/lambda/SendmessageHandler-WS-SKR
+      RetentionInDays: 7
+    DeletionPolicy: Delete
+    UpdateReplacePolicy: Delete
+
   DefaultLambdaHandler:
     Type: AWS::Serverless::Function
+    DependsOn: DefaultLambdaHandlerLogGroup
     Properties:
       FunctionName: DefaultHandler-WS-SKR
       Handler: defaultHandler.handler
       Policies:
         - CloudWatchPutMetricPolicy: {}
         - Statement:
-            Effect: Allow
-            Action: execute-api:ManageConnections
-            Resource: arn:aws:execute-api:*:*:*/*/*/@connections/*
+            - Effect: Allow
+              Action:
+                - "execute-api:ManageConnections"
+              Resource:
+                - !Sub "arn:aws:execute-api:${AWS::Region}:${AWS::AccountId}:${WebsocketApi}/*"
     Metadata:
       BuildMethod: esbuild
       BuildProperties:
@@ -138,15 +176,178 @@ Resources:
           - "aws-lambda"
           - "@aws-sdk/client-apigatewaymanagementapi"
 
+  DefaultLambdaHandlerLogGroup:
+    Type: AWS::Logs::LogGroup
+    Properties:
+      LogGroupName: /aws/lambda/DefaultHandler-WS-SKR
+      RetentionInDays: 7
+    DeletionPolicy: Delete
+    UpdateReplacePolicy: Delete
+
   WebsocketApi:
     Type: AWS::ApiGatewayV2::Api
     Properties:
       Name: Websocket-Api-SKR
       ProtocolType: WEBSOCKET
       RouteSelectionExpression: "$request.body.action"
+  
+  WebSocketLogGroup:
+    Type: AWS::Logs::LogGroup
+    Properties:
+      LogGroupName: !Sub "/aws/apigateway/websocket/${WebsocketApi}"
+      RetentionInDays: 7
+    DeletionPolicy: Delete
+    UpdateReplacePolicy: Delete
 
   ConnectRoute:
     Type: AWS::ApiGatewayV2::Route
     Properties:
-      RouteKey: 
-      ApiId: 
+      ApiId: !Ref WebsocketApi
+      RouteKey: $connect
+      AuthorizationType: NONE
+      Target: !Sub integrations/${ConnectIntegration}
+      
+  ConnectGroupRoute:
+    Type: AWS::ApiGatewayV2::Route
+    Properties:
+      ApiId: !Ref WebsocketApi
+      RouteKey: connectGroup
+      AuthorizationType: NONE
+      Target: !Sub integrations/${ConnectIntegration}
+
+  ConnectIntegration:
+    Type: AWS::ApiGatewayV2::Integration
+    Properties:
+      ApiId: !Ref WebsocketApi
+      IntegrationType: AWS_PROXY
+      IntegrationUri: !Sub "arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${ConnectLambdaHandler.Arn}/invocations"
+
+  ConnectLambdaPermission:
+    Type: AWS::Lambda::Permission
+    Properties:
+      FunctionName: !GetAtt ConnectLambdaHandler.Arn
+      Action: lambda:InvokeFunction
+      Principal: apigateway.amazonaws.com
+      SourceArn: !Sub "arn:aws:execute-api:${AWS::Region}:${AWS::AccountId}:${WebsocketApi}/*"
+
+  DisconnectRoute:
+    Type: AWS::ApiGatewayV2::Route
+    Properties:
+      ApiId: !Ref WebsocketApi
+      RouteKey: $disconnect
+      AuthorizationType: NONE
+      Target: !Sub integrations/${DisconnectIntegration}
+
+  DisconnectGroupRoute:
+    Type: AWS::ApiGatewayV2::Route
+    Properties:
+      ApiId: !Ref WebsocketApi
+      RouteKey: disconnectGroup
+      AuthorizationType: NONE
+      Target: !Sub integrations/${DisconnectIntegration}
+
+  DisconnectIntegration:
+    Type: AWS::ApiGatewayV2::Integration
+    Properties:
+      ApiId: !Ref WebsocketApi
+      IntegrationType: AWS_PROXY
+      IntegrationUri: !Sub "arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${DisconnectLambdaHandler.Arn}/invocations"
+
+  DisconnectLambdaPermission:
+    Type: AWS::Lambda::Permission
+    Properties:
+      FunctionName: !GetAtt DisconnectLambdaHandler.Arn
+      Action: lambda:InvokeFunction
+      Principal: apigateway.amazonaws.com
+      SourceArn: !Sub "arn:aws:execute-api:${AWS::Region}:${AWS::AccountId}:${WebsocketApi}/*"
+
+  DefaultRoute:
+    Type: AWS::ApiGatewayV2::Route
+    Properties:
+      ApiId: !Ref WebsocketApi
+      RouteKey: $default
+      AuthorizationType: NONE
+      Target: !Sub integrations/${DefaultIntegration}
+
+  DefaultIntegration:
+    Type: AWS::ApiGatewayV2::Integration
+    Properties:
+      ApiId: !Ref WebsocketApi
+      IntegrationType: AWS_PROXY
+      IntegrationUri: !Sub "arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${DefaultLambdaHandler.Arn}/invocations"
+
+  DefaultLambdaPermission:
+    Type: AWS::Lambda::Permission
+    Properties:
+      FunctionName: !GetAtt DefaultLambdaHandler.Arn
+      Action: lambda:InvokeFunction
+      Principal: apigateway.amazonaws.com
+      SourceArn: !Sub "arn:aws:execute-api:${AWS::Region}:${AWS::AccountId}:${WebsocketApi}/*"
+
+  SendMessageRoute:
+    Type: AWS::ApiGatewayV2::Route
+    Properties:
+      ApiId: !Ref WebsocketApi
+      RouteKey: sendMessage
+      AuthorizationType: NONE
+      Target: !Sub integrations/${SendMessageIntegration}
+
+  SendGroupMessageRoute:
+    Type: AWS::ApiGatewayV2::Route
+    Properties:
+      ApiId: !Ref WebsocketApi
+      RouteKey: sendMessageGroup
+      AuthorizationType: NONE
+      Target: !Sub integrations/${SendMessageIntegration}
+
+  SendMessageIntegration:
+    Type: AWS::ApiGatewayV2::Integration
+    Properties:
+      ApiId: !Ref WebsocketApi
+      IntegrationType: AWS_PROXY
+      IntegrationUri: !Sub "arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${SendMessageLambdaHandler.Arn}/invocations"
+
+  SendMessageLambdaPermission:
+    Type: AWS::Lambda::Permission
+    Properties:
+      FunctionName: !GetAtt SendMessageLambdaHandler.Arn
+      Action: lambda:InvokeFunction
+      Principal: apigateway.amazonaws.com
+      SourceArn: !Sub "arn:aws:execute-api:${AWS::Region}:${AWS::AccountId}:${WebsocketApi}/*"
+
+  ApiGatewayDeployment:
+    Type: AWS::ApiGatewayV2::Deployment
+    Properties:
+      ApiId: !Ref WebsocketApi
+    DependsOn:
+      - ConnectRoute
+      - DisconnectRoute
+      - DefaultRoute
+      - SendMessageRoute
+      - ConnectGroupRoute
+      - DisconnectGroupRoute
+      - SendGroupMessageRoute
+
+  ApiGatewayStage:
+    Type: AWS::ApiGatewayV2::Stage
+    Properties:
+      ApiId: !Ref WebsocketApi
+      StageName: v1
+      DeploymentId: !Ref ApiGatewayDeployment
+      AccessLogSettings:
+        DestinationArn: !GetAtt ApiGatewayLogGroup.Arn
+        Format: >
+          {
+            "requestTime": "$context.requestTime",
+            "requestId": "$context.requestId",
+            "httpMethod": "$context.httpMethod",
+            "path": "$context.path",
+            "status": "$context.status",
+            "responseLength": "$context.responseLength",
+            "ip": "$context.identity.sourceIp"
+          }
+
+Outputs:
+  WebsocketApiUrl:
+    Description: "Websocket URL"
+    Value: !Sub "wss://${WebsocketApi}.execute-api.${AWS::Region}.amazonaws.com/v1"
