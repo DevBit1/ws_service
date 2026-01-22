@@ -1,19 +1,5 @@
 import { handler } from "../src/functions/defaultHandler";
 
-// Mock the lambda utility module
-jest.mock("../src/utils/lambda", () => ({
-  getEnvValue: jest.fn((key: string) => {
-    const envMap: Record<string, string> = {
-      CONNECTION_TABLE_NAME: "test-connection-table",
-      GROUP_TABLE_NAME: "test-group-table",
-      AWS_REGION_OP: "us-east-1",
-    };
-    return envMap[key] || "";
-  }),
-  ResponseObj: jest.requireActual("../src/utils/lambda").ResponseObj,
-}));
-
-// Mock the webSocket utility module
 const mockGetApiClient = jest.fn();
 const mockGetConnectionInfo = jest.fn();
 const mockPostMessage = jest.fn();
@@ -29,14 +15,12 @@ jest.mock("../src/utils/webSocket", () => ({
 
 describe("defaultHandler", () => {
   beforeEach(() => {
-    // Reset all mocks before each test
     mockGetApiClient.mockClear();
     mockGetConnectionInfo.mockClear();
     mockPostMessage.mockClear();
   });
 
   it("should get connection info and send it back to the client", async () => {
-    // Arrange
     const event = {
       requestContext: {
         connectionId: "test-connection-123",
@@ -55,10 +39,8 @@ describe("defaultHandler", () => {
     mockGetConnectionInfo.mockResolvedValue(mockConnectionInfo);
     mockPostMessage.mockResolvedValue({});
 
-    // Act
     const result = await handler(event as any);
 
-    // Assert
     expect(result.statusCode).toBe(200);
     expect(mockGetApiClient).toHaveBeenCalledWith(
       "test.execute-api.us-east-1.amazonaws.com",
@@ -76,7 +58,6 @@ describe("defaultHandler", () => {
   });
 
   it("should return 500 when getConnectionInfo fails", async () => {
-    // Arrange
     const event = {
       requestContext: {
         connectionId: "test-connection-789",
@@ -90,16 +71,13 @@ describe("defaultHandler", () => {
     mockGetApiClient.mockReturnValue(mockApiClient);
     mockGetConnectionInfo.mockRejectedValue(new Error("Connection info error"));
 
-    // Act
     const result = await handler(event as any);
 
-    // Assert
     expect(result.statusCode).toBe(500);
     expect(mockPostMessage).not.toHaveBeenCalled();
   });
 
   it("should return 500 when postMessage fails", async () => {
-    // Arrange
     const event = {
       requestContext: {
         connectionId: "test-connection-999",
@@ -117,16 +95,13 @@ describe("defaultHandler", () => {
     mockGetConnectionInfo.mockResolvedValue(mockConnectionInfo);
     mockPostMessage.mockRejectedValue(new Error("Post message error"));
 
-    // Act
     const result = await handler(event as any);
 
-    // Assert
     expect(result.statusCode).toBe(500);
     expect(mockGetConnectionInfo).toHaveBeenCalled();
   });
 
   it("should return 500 when getApiClient fails", async () => {
-    // Arrange
     const event = {
       requestContext: {
         connectionId: "test-connection-000",
@@ -139,10 +114,8 @@ describe("defaultHandler", () => {
       throw new Error("API client error");
     });
 
-    // Act
     const result = await handler(event as any);
 
-    // Assert
     expect(result.statusCode).toBe(500);
     expect(mockGetConnectionInfo).not.toHaveBeenCalled();
     expect(mockPostMessage).not.toHaveBeenCalled();

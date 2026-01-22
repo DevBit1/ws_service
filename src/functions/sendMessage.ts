@@ -3,23 +3,18 @@ import { docClient } from "../utils/db";
 import { APIGatewayEvent } from "aws-lambda";
 import { getEnvValue, ResponseObj } from "../utils/lambda";
 import { getApiClient, postMessage } from "../utils/webSocket";
+import { logger } from "../utils/logger";
+import { validate } from "../utils/validation";
+import { sendMessageGroupSchema, sendMessageSchema } from "../utils/schemas";
 
 export const handler = async function (event: APIGatewayEvent) {
   try {
-    console.log(
-      "Received Event Send message :",
-      JSON.stringify(event, null, 2),
-    );
-
+    logger.info("Received event in send message handler: ", {
+      eventData: event,
+    });
     const routeKey = event?.requestContext?.routeKey || "";
 
     if (!routeKey) {
-      return new ResponseObj(400);
-    }
-
-    const payload = JSON.parse(event?.body || "{}");
-
-    if (!payload?.message) {
       return new ResponseObj(400);
     }
 
@@ -32,6 +27,13 @@ export const handler = async function (event: APIGatewayEvent) {
 
     switch (routeKey) {
       case "sendMessage": {
+        const payload = validate(
+          sendMessageSchema,
+          JSON.parse(event?.body || "{}"),
+        );
+        if (!payload) {
+          return new ResponseObj(400);
+        }
         const getAllConnections = new ScanCommand({
           TableName: getEnvValue("CONNECTION_TABLE_NAME"),
         });
@@ -51,7 +53,11 @@ export const handler = async function (event: APIGatewayEvent) {
         break;
       }
       case "sendMessageGroup": {
-        if (!payload?.groupId) {
+        const payload = validate(
+          sendMessageGroupSchema,
+          JSON.parse(event?.body!),
+        );
+        if (!payload) {
           return new ResponseObj(400);
         }
 
@@ -79,17 +85,19 @@ export const handler = async function (event: APIGatewayEvent) {
 
         const usersInGroup = await docClient.send(command);
 
-        const allPromises = usersInGroup.Items?.map(
-          async ({ connectionId }) => {
-            if (connectionId === event.requestContext.connectionId) {
-              return {};
-            }
+        if (usersInGroup.Items) {
+          const allPromises = usersInGroup.Items.map(
+            async ({ connectionId }) => {
+              if (connectionId === event.requestContext.connectionId) {
+                return {};
+              }
 
-            await postMessage(apiClient, connectionId, payload.message);
-          },
-        );
+              await postMessage(apiClient, connectionId, payload.message);
+            },
+          );
 
-        await Promise.all(allPromises!);
+          await Promise.all(allPromises);
+        }
 
         break;
       }
@@ -98,7 +106,10 @@ export const handler = async function (event: APIGatewayEvent) {
     }
     return new ResponseObj(200);
   } catch (err) {
-    console.log(err);
+    logger.error(
+      "Error while connecting with send message handler",
+      err as Error,
+    );
     return new ResponseObj(500);
   }
 };

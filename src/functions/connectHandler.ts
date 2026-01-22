@@ -2,10 +2,15 @@ import { PutCommand } from "@aws-sdk/lib-dynamodb";
 import { docClient } from "../utils/db";
 import { APIGatewayEvent } from "aws-lambda";
 import { getEnvValue, ResponseObj } from "../utils/lambda";
+import { logger } from "../utils/logger";
+import { validate } from "../utils/validation";
+import { connectGroupSchema } from "../utils/schemas";
 
 export const handler = async function (event: APIGatewayEvent) {
   try {
-    console.log("Received Event Connect :", JSON.stringify(event, null, 2));
+    logger.info("Event received : ", {
+      eventData: event,
+    });
 
     const routeKey = event?.requestContext?.routeKey || "";
 
@@ -27,9 +32,12 @@ export const handler = async function (event: APIGatewayEvent) {
         break;
       }
       case "connectGroup": {
-        const payload = JSON.parse(event?.body || "{}");
+        const payload = validate(
+          connectGroupSchema,
+          JSON.parse(event?.body || "{}"),
+        );
 
-        if (!payload?.groupId) {
+        if (!payload) {
           return new ResponseObj(400);
         }
 
@@ -50,7 +58,7 @@ export const handler = async function (event: APIGatewayEvent) {
     await docClient.send(command);
     return new ResponseObj(200);
   } catch (err) {
-    console.log(err);
+    logger.error("Error while connecting with connect handler", err as Error);
     return new ResponseObj(500);
   }
 };

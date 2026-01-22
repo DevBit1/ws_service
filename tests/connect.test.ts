@@ -4,26 +4,7 @@ import { DynamoDBDocumentClient, PutCommand } from "@aws-sdk/lib-dynamodb";
 
 const ddbMock = mockClient(DynamoDBDocumentClient);
 
-jest.mock("../src/utils/lambda", () => ({
-  getEnvValue: jest.fn((key: string) => {
-    const envMap: Record<string, string> = {
-      CONNECTION_TABLE_NAME: "test-connection-table",
-      GROUP_TABLE_NAME: "test-group-table",
-      AWS_REGION_OP: "us-east-1",
-    };
-    return envMap[key] || "";
-  }),
-  ResponseObj: jest.requireActual("../src/utils/lambda").ResponseObj,
-}));
-
 describe("connectHandler", () => {
-    
-  beforeAll(() => {
-    process.env = {
-
-    }
-  });
-
   beforeEach(() => {
     ddbMock.reset();
   });
@@ -163,6 +144,25 @@ describe("connectHandler", () => {
 
       expect(result.statusCode).toBe(400);
       expect(ddbMock.calls()).toHaveLength(0);
+    });
+
+    it("should throw error when environment variable is missing", async () => {
+      const originalEnv = process.env.CONNECTION_TABLE_NAME;
+      delete process.env.CONNECTION_TABLE_NAME;
+
+      const event = {
+        requestContext: {
+          routeKey: "$connect",
+          connectionId: "test-connection-123",
+        },
+      };
+
+      ddbMock.on(PutCommand).resolves({});
+      const result = await handler(event as any)
+
+      expect(result.statusCode).toBe(500)
+
+      process.env.CONNECTION_TABLE_NAME = originalEnv;
     });
   });
 });

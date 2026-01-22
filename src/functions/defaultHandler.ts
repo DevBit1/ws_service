@@ -5,10 +5,13 @@ import {
   postMessage,
 } from "../utils/webSocket";
 import { ResponseObj } from "../utils/lambda";
+import { logger } from "../utils/logger";
 
 export const handler = async (event: APIGatewayEvent) => {
   try {
-    console.log(JSON.stringify(event, null, 2));
+    logger.info("Received event in default handler: ", {
+      eventData: event,
+    });
     const connectionId = event.requestContext.connectionId!;
 
     const apiClient = getApiClient(
@@ -22,7 +25,7 @@ export const handler = async (event: APIGatewayEvent) => {
 
     return new ResponseObj(200);
   } catch (err) {
-    console.log(err);
+    logger.error("Error while connecting with default handler", err as Error);
     return new ResponseObj(500);
   }
 };

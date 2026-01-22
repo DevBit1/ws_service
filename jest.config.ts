@@ -22,10 +22,7 @@ const config: Config = {
   collectCoverage: true,
 
   // An array of glob patterns indicating a set of files for which coverage information should be collected
-  collectCoverageFrom: [
-    "src/**/*.js", 
-    "src/**/*.ts" 
-  ],
+  collectCoverageFrom: ["src/**/*.js", "src/**/*.ts"],
 
   // The directory where Jest should output its coverage files
   // coverageDirectory: undefined,
@@ -33,7 +30,7 @@ const config: Config = {
   // An array of regexp pattern strings used to skip coverage collection
   coveragePathIgnorePatterns: [
     "/node_modules/",
-    "/src/utils"
+    // "/src/utils"
   ],
 
   // Indicates which provider should be used to instrument code for coverage
@@ -53,8 +50,8 @@ const config: Config = {
       functions: 100,
       branches: 100,
       lines: 100,
-      statements: 100
-    }
+      statements: 100,
+    },
   },
 
   // A path to a custom dependency extractor
