@@ -335,17 +335,8 @@ Resources:
       StageName: v1
       DeploymentId: !Ref ApiGatewayDeployment
       AccessLogSettings:
-        DestinationArn: !GetAtt ApiGatewayLogGroup.Arn
-        Format: >
-          {
-            "requestTime": "$context.requestTime",
-            "requestId": "$context.requestId",
-            "httpMethod": "$context.httpMethod",
-            "path": "$context.path",
-            "status": "$context.status",
-            "responseLength": "$context.responseLength",
-            "ip": "$context.identity.sourceIp"
-          }
+        DestinationArn: !GetAtt WebSocketLogGroup.Arn
+        Format: '{"requestTime":"$context.requestTime","requestId":"$context.requestId","httpMethod":"$context.httpMethod","path":"$context.path","status":"$context.status","responseLength":"$context.responseLength","ip":"$context.identity.sourceIp"}'
 
 Outputs:
   WebsocketApiUrl:
