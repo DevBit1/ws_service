@@ -14,7 +14,7 @@ stack_name = "WS-Service-SKR"
 resolve_s3 = true
 s3_prefix = "WS-Service-SKR"
 region = "ap-south-1"
-confirm_changeset = true
+confirm_changeset = false
 capabilities = ["CAPABILITY_IAM", "CAPABILITY_AUTO_EXPAND"]
 image_repositories = []
 
