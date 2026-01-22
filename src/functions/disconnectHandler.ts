@@ -2,17 +2,18 @@ import { DeleteCommand } from "@aws-sdk/lib-dynamodb";
 import { docClient } from "../utils/db";
 import { APIGatewayEvent } from "aws-lambda";
 import { getEnvValue, ResponseObj } from "../utils/lambda";
+import { logger } from "../utils/logger";
 
 export const handler = async function (event: APIGatewayEvent) {
   try {
-    console.log("Received Event Disconnect :", JSON.stringify(event, null, 2));
+    logger.info("Received event in disconnect handler: ", {
+      eventData: event,
+    });
 
     const routeKey = event?.requestContext?.routeKey || "";
 
     if (!routeKey) {
-      return new ResponseObj(400, {
-        message: "Invalid route",
-      });
+      return new ResponseObj(400);
     }
 
     let command;
@@ -32,9 +33,7 @@ export const handler = async function (event: APIGatewayEvent) {
         const payload = JSON.parse(event?.body || "{}");
 
         if (!payload?.groupId) {
-          return new ResponseObj(400, {
-            message: "Group Id is required to join a group",
-          });
+          return new ResponseObj(400);
         }
 
         command = new DeleteCommand({
@@ -48,16 +47,16 @@ export const handler = async function (event: APIGatewayEvent) {
         break;
       }
       default:
-        return new ResponseObj(400, {
-          message: "Invalid route",
-        });
+        return new ResponseObj(400);
     }
 
     await docClient.send(command);
+    return new ResponseObj(200);
   } catch (err) {
-    console.log(err);
-    return new ResponseObj(500, {
-      message: err instanceof Error ? err.message : "Error when disconnecting",
-    });
+    logger.error(
+      "Error while connecting with disconnect handler",
+      err as Error,
+    );
+    return new ResponseObj(500);
   }
 };

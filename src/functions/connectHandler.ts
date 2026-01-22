@@ -2,17 +2,20 @@ import { PutCommand } from "@aws-sdk/lib-dynamodb";
 import { docClient } from "../utils/db";
 import { APIGatewayEvent } from "aws-lambda";
 import { getEnvValue, ResponseObj } from "../utils/lambda";
+import { logger } from "../utils/logger";
+import { validate } from "../utils/validation";
+import { connectGroupSchema } from "../utils/schemas";
 
 export const handler = async function (event: APIGatewayEvent) {
   try {
-    console.log("Received Event Connect :", JSON.stringify(event, null, 2));
+    logger.info("Event received : ", {
+      eventData: event,
+    });
 
     const routeKey = event?.requestContext?.routeKey || "";
 
     if (!routeKey) {
-      return new ResponseObj(400, {
-        message: "Invalid route",
-      });
+      return new ResponseObj(400);
     }
 
     let command;
@@ -29,12 +32,13 @@ export const handler = async function (event: APIGatewayEvent) {
         break;
       }
       case "connectGroup": {
-        const payload = JSON.parse(event?.body || "{}");
+        const payload = validate(
+          connectGroupSchema,
+          JSON.parse(event?.body || "{}"),
+        );
 
-        if (!payload?.groupId) {
-          return new ResponseObj(400, {
-            message: "Group Id is required to join a group",
-          });
+        if (!payload) {
+          return new ResponseObj(400);
         }
 
         command = new PutCommand({
@@ -48,16 +52,13 @@ export const handler = async function (event: APIGatewayEvent) {
         break;
       }
       default:
-        return new ResponseObj(400, {
-          message: "Invalid route",
-        });
+        return new ResponseObj(400);
     }
 
     await docClient.send(command);
+    return new ResponseObj(200);
   } catch (err) {
-    console.log(err);
-    return new ResponseObj(500, {
-      message: err instanceof Error ? err.message : "Error when connecting",
-    });
+    logger.error("Error while connecting with connect handler", err as Error);
+    return new ResponseObj(500);
   }
 };
