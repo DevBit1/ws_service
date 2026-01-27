@@ -6,6 +6,7 @@ import { getApiClient, postMessage } from "../utils/webSocket";
 import { logger } from "../utils/logger";
 import { validate } from "../utils/validation";
 import { sendMessageGroupSchema, sendMessageSchema } from "../utils/schemas";
+import { search } from "@aws-lambda-powertools/jmespath";
 
 export const handler = async function (event: APIGatewayEvent) {
   try {
@@ -40,15 +41,18 @@ export const handler = async function (event: APIGatewayEvent) {
 
         const { Items = [] } = await docClient.send(getAllConnections);
 
-        const allPromises = Items.map(async ({ connectionId }) => {
-          if (connectionId === event.requestContext.connectionId) {
-            return {};
-          }
+        const connectionIds = search(
+          `[?connectionId != '${event.requestContext.connectionId}'].connectionId`,
+          Items,
+        ) as string[] | null;
 
-          await postMessage(apiClient, connectionId, payload.message);
-        });
+        if (connectionIds) {
+          const allPromises = connectionIds.map(async (connectionId) => {
+            await postMessage(apiClient, connectionId, payload.message);
+          });
 
-        await Promise.all(allPromises);
+          await Promise.all(allPromises);
+        }
 
         break;
       }
@@ -85,16 +89,15 @@ export const handler = async function (event: APIGatewayEvent) {
 
         const usersInGroup = await docClient.send(command);
 
-        if (usersInGroup.Items) {
-          const allPromises = usersInGroup.Items.map(
-            async ({ connectionId }) => {
-              if (connectionId === event.requestContext.connectionId) {
-                return {};
-              }
+        const groupConnectionIds = search(
+          `Items[?connectionId != '${event.requestContext.connectionId}'].connectionId`,
+          usersInGroup,
+        ) as string[] | null;
 
-              await postMessage(apiClient, connectionId, payload.message);
-            },
-          );
+        if (groupConnectionIds) {
+          const allPromises = groupConnectionIds.map(async (connectionId) => {
+            await postMessage(apiClient, connectionId, payload.message);
+          });
 
           await Promise.all(allPromises);
         }
